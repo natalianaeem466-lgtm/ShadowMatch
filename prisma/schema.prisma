@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  STUDENT
+  MENTOR
+  COMPANY_ADMIN
+}
+
+enum MicroTaskType {
+  TESTING
+  BUG_FIX
+  DOCS
+  UI
+}
+
+enum MicroTaskStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  UNDER_REVIEW
+  COMPLETED
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  role           UserRole @default(STUDENT)
+  githubUsername String?  @unique
+  bio            String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  studentProfile StudentProfile?
+  companyProfile CompanyProfile?
+
+  @@map("users")
+}
+
+model StudentProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  university         String
+  graduationYear     Int
+  skills             String[]
+  verifiedBadgeCount Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  applications TaskApplication[]
+  proofsOfWork ProofOfWork[]
+
+  @@map("student_profiles")
+}
+
+model CompanyProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName String
+  website     String?
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks MicroTask[]
+
+  @@map("company_profiles")
+}
+
+model MicroTask {
+  id             String          @id @default(cuid())
+  companyId      String
+  company        CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title          String
+  description    String
+  type           MicroTaskType
+  durationDays   Int
+  stipendAmount  Decimal         @db.Decimal(10, 2)
+  status         MicroTaskStatus @default(DRAFT)
+  githubIssueUrl String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  applications TaskApplication[]
+  proofsOfWork ProofOfWork[]
+
+  @@index([companyId])
+  @@index([status])
+
+  @@map("micro_tasks")
+}
+
+model TaskApplication {
+  id        String            @id @default(cuid())
+  taskId    String
+  task      MicroTask         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  studentId String
+  student   StudentProfile    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  status    ApplicationStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([taskId, studentId])
+  @@index([studentId])
+
+  @@map("task_applications")
+}
+
+model ProofOfWork {
+  id                  String         @id @default(cuid())
+  taskId              String
+  task                MicroTask      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  studentId           String
+  student             StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  pullRequestUrl      String
+  mentorRating        Int?
+  mentorReview        String?
+  verifiedBadgeIssued Boolean        @default(false)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([taskId])
+  @@index([studentId])
+
+  @@map("proofs_of_work")
+}
